@@ -1,0 +1,15 @@
+/ {
+	aliases {
+		led2 = &ext_led;
+	};
+};
+
+&leds {
+	ext_led: ext_led {
+		gpios = <&gpiog 12 GPIO_ACTIVE_HIGH>;
+	};
+};
+
+&iwdg {
+	status = "okay";
+};
