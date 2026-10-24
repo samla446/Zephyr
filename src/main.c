@@ -13,6 +13,7 @@
 #include <zephyr/kvss/nvs.h>
 #include <zephyr/drivers/watchdog.h>
 #include <zephyr/drivers/hwinfo.h>
+#include <zephyr/drivers/can.h>
 
 #define SLEEP_TIME_MS   1000
 #define LED0_NODE DT_ALIAS(led0)
@@ -80,7 +81,9 @@ struct sensor_data{
 	int temp;
 	int hum;
 };
-
+//--can--//
+static const struct device *const can_dev = DEVICE_DT_GET(DT_CHOSEN(zephyr_canbus));
+CAN_MSGQ_DEFINE(can_rx_msgq, 8);// CAN 接收消息队列，最多 8 条消息
 struct sensor_data g_sensor;
 #define LED_THREAD_STACK_SIZE 1024
 #define LED_THREAD_PRIORITY 7
@@ -450,7 +453,66 @@ static void print_reset_cause(void){
 	}
 	hwinfo_clear_reset_cause();
 }
+//can_thread
+void can_thread(void *arg1,void *arg2,void *arg3){
+	if(!device_is_ready(can_dev)){
+		printk("Error: %s device is not ready\n", can_dev->name);
+		return;
+	}
+	//测试回环模式
+	int rc = can_set_mode(can_dev, CAN_MODE_LOOPBACK);
+	if(rc != 0){
+		printk("ERR: can_set_mode failed: %d\n", rc);
+		return;
+	}
+	//启动控制器
+	rc = can_start(can_dev);
+	if(rc != 0){
+		printk("ERR: can_start failed: %d\n", rc);
+		return;
+	}
 
+	//配置过滤器：只接收ID=0x123的报文
+	struct can_filter filter = {
+		.flags = 0,//标准帧11位id
+		.id = 0x123,
+		.mask = CAN_STD_ID_MASK,//只匹配11位id
+	};
+	rc = can_add_rx_filter_msgq(can_dev, &can_rx_msgq, &filter);
+	if(rc < 0){
+		printk("ERR: can_add_rx_filter_msgq failed: %d\n", rc);
+		return;
+	}
+	printk("CAN loopback ready,waiting for messages...\n");
+	uint8_t counter = 0;
+	while(1){
+		//造一帧
+		struct can_frame tx = {0};
+		tx.id = 0x123;
+		tx.dlc = 8;
+		tx.data[0] = counter;
+		tx.data[1] = 0xAA;
+		tx.data[2] = 0x55;
+		rc = can_send(can_dev, &tx, K_MSEC(100), NULL, NULL);
+		if(rc != 0){
+			printk("ERR: can_send failed: %d\n", rc);
+		}else{
+			printk("CAN sent: id=0x%03X, data[0]=%d\n", tx.id, tx.data[0]);
+		}
+		//从消息队列里取接收到的报文
+		struct can_frame rx = {0};
+		rc = k_msgq_get(&can_rx_msgq, &rx, K_MSEC(100));
+		if(rc == 0){
+			printk("RX id=0x%03X, data[0]=%d\n", rx.id, rx.data[0]);
+		}else{
+			printk("No CAN message received\n");
+		}
+		counter++;
+		k_msleep(2000);
+	}
+}
+
+K_THREAD_DEFINE(Can_tid, 1024, can_thread, NULL, NULL, NULL, 7, 0, 0);
 int main(void){
 	printk("Hello World! %s\n", CONFIG_BOARD);
 	printk("版本: 1.0.4\n");
