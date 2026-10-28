@@ -476,7 +476,7 @@ void can_thread(void *arg1,void *arg2,void *arg3){
 	struct can_filter filter = {
 		.flags = 0,//标准帧11位id
 		.id = 0,
-		.mask = 0,//只匹配11位id
+		.mask = 0,//全收
 	};
 	rc = can_add_rx_filter_msgq(can_dev, &can_rx_msgq, &filter);
 	if(rc < 0){
