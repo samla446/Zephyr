@@ -460,7 +460,7 @@ void can_thread(void *arg1,void *arg2,void *arg3){
 		return;
 	}
 	//测试回环模式
-	int rc = can_set_mode(can_dev, CAN_MODE_LOOPBACK);
+	int rc = can_set_mode(can_dev, CAN_MODE_NORMAL);
 	if(rc != 0){
 		printk("ERR: can_set_mode failed: %d\n", rc);
 		return;
@@ -475,8 +475,8 @@ void can_thread(void *arg1,void *arg2,void *arg3){
 	//配置过滤器：只接收ID=0x123的报文
 	struct can_filter filter = {
 		.flags = 0,//标准帧11位id
-		.id = 0x123,
-		.mask = CAN_STD_ID_MASK,//只匹配11位id
+		.id = 0,
+		.mask = 0,//只匹配11位id
 	};
 	rc = can_add_rx_filter_msgq(can_dev, &can_rx_msgq, &filter);
 	if(rc < 0){

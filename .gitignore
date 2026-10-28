@@ -1,3 +1,12 @@
 build/
 sensor_log.csv
 .vscode/
+
+# Keil F103 工程编译产物与个人界面状态
+f103_gateway/Objects/
+f103_gateway/Listings/
+f103_gateway/Project.uvguix.*
+
+# Python 缓存
+__pycache__/
+*.pyc
